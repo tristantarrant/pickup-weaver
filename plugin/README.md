@@ -122,7 +122,7 @@ qemu), macOS/Windows, AU, real DAWs. This Carla build has no CLAP support, so CL
 the custom host only.
 
 ## Licensing notes
-Pickup Weaver is GPL-2.0-or-later (see `../../LICENSE`).
+Pickup Weaver is GPL-2.0-or-later (see `../LICENSE`).
 DPF and the four chosen formats are permissive: DPF ISC, LV2 ISC, VST2 BSD-3 (Xaymar's clean-room
 headers bundled with DPF), VST3 ISC (DPF's own "travesty" headers, no Steinberg SDK), CLAP MIT.
 All require attribution (see `../dpf/LICENSING.md`). LADSPA/DSSI (LGPL headers) are not built.
