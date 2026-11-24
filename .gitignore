@@ -1,0 +1,9 @@
+bin/
+build/
+*.so
+*.o
+*.a
+__pycache__/
+dsp/pw_cli
+dsp/tests/pw_cli_ref
+plugin/gui-preview/
