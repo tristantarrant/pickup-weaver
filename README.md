@@ -65,6 +65,10 @@ make install INSTALL_DIR=~/.lv2
 make install-all INSTALL_DIR=~/.lv2 VST2_DIR=~/.vst VST3_DIR=~/.vst3 CLAP_DIR=~/.clap
 ```
 
+Prebuilt Linux x86_64 and arm64 archives are attached to the GitHub
+releases (the release workflow builds them with CMake; the DPF Makefile
+action is not used because this project uses CMake).
+
 `make` configures and builds with CMake (Release), producing
 `pickup_weaver.lv2` (DSP + UI + modgui), `pickup_weaver.vst3`,
 `pickup_weaver.clap` and `pickup_weaver-vst2.so`. DPF is a submodule pinned
