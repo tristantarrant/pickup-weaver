@@ -56,6 +56,8 @@ remaining parameters stay in MOD's settings panel, generated from the
 plugin description. The knob sprites are rendered by the same painter as
 the desktop GUI.
 
+House rule: **editor-class UIs use NanoVG/DGL** (OpenGL); cairo is reserved for the pedal-face plugins.
+
 ## Building
 
 ```bash
