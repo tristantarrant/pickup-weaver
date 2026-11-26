@@ -95,8 +95,42 @@ static const KnobDef kKnobs[7] = {
     { kVolume, "Volume" }, { kTone, "Tone" },
 };
 
-struct ToggleDef { int param; const char* label; };
-static const ToggleDef kToggles[2] = { { kBodyEnabled, "Enable" }, { kBodyPhase, "Phase" } };
+// Hover hints, one per kKnobs entry / source tile.
+static const char* const kKnobHints[7] = {
+    "Morph between the source pickup and the target model",
+    "Output level after the pickup model (-20 to +20 dB)",
+    "Pickup and cable brightness (resonance and load)",
+    "How much of the hollow-body resonance is mixed in",
+    "Body depth: sets the lowest resonance mode",
+    "Volume-pot position (with its treble bleed)",
+    "Tone-pot position (10 = fully open)",
+};
+
+static const char* const kTileHints[4] = {
+    "Source pickup: humbucker",
+    "Source pickup: single coil",
+    "Source pickup: bright single coil",
+    "Source pickup: piezo under-saddle strip",
+};
+
+const char* tooltipText(const Hit& h)
+{
+    switch (h.type)
+    {
+    case Hit::KNOB:
+        for (int k = 0; k < 7; ++k)
+            if (kKnobs[k].param == h.index)
+                return kKnobHints[k];
+        return nullptr;
+    case Hit::TILE:   return (h.index >= 0 && h.index < 4) ? kTileHints[h.index] : nullptr;
+    case Hit::TOGGLE: return "Invert the hollow-body resonance (phase)";
+    case Hit::BYPASS: return "Bypass the whole effect";
+    case Hit::PREV:   return "Previous target model";
+    case Hit::NEXT:   return "Next target model";
+    case Hit::PAD:    return "Drag to shape the E-Custom and AC-Custom models";
+    default:          return nullptr;
+    }
+}
 
 static const char* const kTileLabels[4][2] = {
     { "Humbucker", nullptr },
@@ -154,9 +188,7 @@ Layout makeLayout(float w, float h)
 
     L.srcPanel = R(16, 76, 240, 548);
     for (int i = 0; i < 4; ++i)
-        L.tiles[i] = R(26 + (i % 2) * 116, 118 + (i / 2) * 180, 104, 168);
-    L.pickupEnablePill = R(30, 496, 38, 20);
-    L.pickupEnableLabel = R(78, 496, 168, 20);
+        L.tiles[i] = R(26, 112 + i * 126, 220, 114);
 
     L.tgtPanel = R(268, 76, 432, 548);
     L.art = R(280, 112, 100, 100);
@@ -173,7 +205,7 @@ Layout makeLayout(float w, float h)
         static const int kRowOf[7] = { 0, 0, 0, 1, 1, 2, 2 };
         static const int kColOf[7] = { 0, 1, 2, 0, 1, 0, 1 };
         static const float kRowCy[3] = { 156.0f, 318.0f, 512.0f };
-        static const int kRowN[3] = { 3, 2, 2 };
+        static const int kRowN[3] = { 3, 3, 2 };
         for (int k = 0; k < 7; ++k)
         {
             const int row = kRowOf[k], col = kColOf[k];
@@ -182,11 +214,10 @@ Layout makeLayout(float w, float h)
             const float cy = kRowCy[row];
             L.knobCell[k] = RectF{ (cx - 42.0f) * s, oy + (cy - 42.0f) * s, 84.0f * s, 84.0f * s };
         }
-    }
-    for (int i = 0; i < 2; ++i)
-    {
-        L.togglePill[i] = R(730 + i * 140, 406, 38, 20);
-        L.toggleLabel[i] = R(778 + i * 140, 406, 76, 20);
+        // the hollow-body phase switch takes the third cell of the body row
+        const float cw = 280.0f / (float)kRowN[1];
+        const float cx = 722.0f + 2 * cw + cw * 0.5f;
+        L.phaseCell = RectF{ (cx - 42.0f) * s, oy + (kRowCy[1] - 42.0f) * s, 84.0f * s, 84.0f * s };
     }
 
     L.customPanel = R(1024, 76, 140, 548);
@@ -203,9 +234,6 @@ Hit hitTest(const Layout& L, float x, float y)
 
     for (int i = 0; i < 4; ++i)
         if (L.tiles[i].contains(x, y)) { h.type = Hit::TILE; h.index = i; return h; }
-
-    if (L.pickupEnablePill.contains(x, y) || L.pickupEnableLabel.contains(x, y))
-    { h.type = Hit::PICKUP_ENABLE; return h; }
 
     if (L.prevBtn.contains(x, y)) { h.type = Hit::PREV; return h; }
     if (L.nextBtn.contains(x, y)) { h.type = Hit::NEXT; return h; }
@@ -230,11 +258,10 @@ Hit hitTest(const Layout& L, float x, float y)
         if (c.contains(x, y)) { h.type = Hit::KNOB; h.index = kKnobs[k].param; return h; }
     }
 
-    for (int i = 0; i < 2; ++i)
     {
-        RectF c = L.togglePill[i];
-        c.x -= 6.0f * L.s; c.w += 84.0f * L.s; c.y -= 8.0f * L.s; c.h += 16.0f * L.s;
-        if (c.contains(x, y)) { h.type = Hit::TOGGLE; h.index = kToggles[i].param; return h; }
+        RectF c = L.phaseCell;
+        c.h += 36.0f * L.s;   // include label/value area
+        if (c.contains(x, y)) { h.type = Hit::TOGGLE; h.index = kBodyPhase; return h; }
     }
 
     if (L.pad.contains(x, y)) { h.type = Hit::PAD; return h; }
@@ -288,22 +315,96 @@ static void drawArrowButton(NVGcontext* vg, const RectF& r, bool left, bool hove
     nvgFill(vg);
 }
 
-static void drawToggle(NVGcontext* vg, const RectF& r, bool on, bool hover)
+// Round on/off switch drawn in the knob's body style: same brass bezel and
+// recessed cap, with a lamp in the middle and a ring that lights when engaged.
+static void drawRoundToggle(NVGcontext* vg, float cx, float cy, float r, bool on, bool hot)
 {
-    const float radius = r.h * 0.5f;
-    rr(vg, r.x, r.y, r.w, r.h, radius);
-    nvgFillColor(vg, on ? rgbai(201, 168, 106, 96) : rgbi(38, 38, 44));
+    nvgBeginPath(vg);
+    nvgCircle(vg, cx, cy, r * 1.20f);
+    nvgStrokeColor(vg, on ? (hot ? kBrassBright : kBrass) : rgbi(78, 74, 66));
+    nvgStrokeWidth(vg, std::fmax(1.5f, r * 0.055f));
+    nvgLineCap(vg, NVG_ROUND);
+    nvgStroke(vg);
+
+    nvgBeginPath(vg);
+    nvgCircle(vg, cx, cy, r);
+    nvgFillPaint(vg, nvgLinearGradient(vg, cx - r, cy - r, cx + r, cy + r,
+                                       rgbi(223, 194, 136), rgbi(138, 116, 74)));
     nvgFill(vg);
-    nvgStrokeColor(vg, hover ? kBrass : (on ? kBrassDark : kCardBorder));
+    nvgStrokeColor(vg, rgbi(92, 77, 51));
     nvgStrokeWidth(vg, 1.0f);
     nvgStroke(vg);
 
-    const float kr = r.h * 0.36f;
-    const float kx = on ? r.x + r.w - kr - 2.5f : r.x + kr + 2.5f;
     nvgBeginPath(vg);
-    nvgCircle(vg, kx, r.y + r.h * 0.5f, kr);
-    nvgFillColor(vg, on ? kBrassBright : rgbi(120, 115, 105));
+    nvgCircle(vg, cx, cy, r * 0.74f);
+    nvgFillPaint(vg, nvgRadialGradient(vg, cx - r * 0.28f, cy - r * 0.32f, r * 0.05f, r * 1.1f,
+                                       rgbi(60, 60, 68), rgbi(22, 22, 26)));
     nvgFill(vg);
+    nvgStrokeColor(vg, rgbi(13, 13, 16));
+    nvgStrokeWidth(vg, 1.0f);
+    nvgStroke(vg);
+
+    if (on)
+    {
+        nvgBeginPath(vg);
+        nvgRect(vg, cx - r, cy - r, 2.0f * r, 2.0f * r);
+        nvgFillPaint(vg, nvgRadialGradient(vg, cx, cy, r * 0.05f, r * 0.95f,
+                                           rgbai(232, 205, 138, 80), rgbai(232, 205, 138, 0)));
+        nvgFill(vg);
+    }
+
+    // power glyph: open ring with a stem, so it reads as a switch, not a knob
+    const float gr = r * 0.30f;
+    nvgStrokeColor(vg, on ? kBrassBright : rgbi(104, 99, 90));
+    nvgStrokeWidth(vg, std::fmax(1.6f, r * 0.075f));
+    nvgLineCap(vg, NVG_ROUND);
+    nvgBeginPath(vg);
+    nvgArc(vg, cx, cy, gr, -1.0208f, 4.1624f, NVG_CW);   // gap at the top
+    nvgStroke(vg);
+    nvgBeginPath(vg);
+    nvgMoveTo(vg, cx, cy - gr * 1.55f);
+    nvgLineTo(vg, cx, cy + gr * 0.10f);
+    nvgStroke(vg);
+}
+
+// Short description of a control, drawn next to the mouse pointer.
+static void drawTooltip(NVGcontext* vg, float w, float h, float s, float mx, float my,
+                        const char* str)
+{
+    const float maxW = 220.0f * s;
+    const float padX = 9.0f * s, padY = 7.0f * s;
+
+    nvgSave(vg);
+    nvgFontFace(vg, "sans");
+    nvgFontSize(vg, 11.0f * s);
+    nvgFontBlur(vg, 0.0f);
+    nvgTextLetterSpacing(vg, 0.2f * s);
+    nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+
+    float b[4];
+    nvgTextBoxBounds(vg, 0.0f, 0.0f, maxW, str, nullptr, b);
+    const float tw = b[2] - b[0];
+    const float th = b[3] - b[1];
+
+    float bx = mx + 16.0f * s;
+    float by = my + 18.0f * s;
+    if (bx + tw + 2.0f * padX > w - 8.0f * s)   // flip to the left of the pointer
+        bx = mx - tw - 2.0f * padX - 10.0f * s;
+    if (by + th + 2.0f * padY > h - 8.0f * s)   // flip above the pointer
+        by = my - th - 2.0f * padY - 12.0f * s;
+    bx = std::fmax(8.0f * s, bx);
+    by = std::fmax(8.0f * s, by);
+
+    rr(vg, bx, by, tw + 2.0f * padX, th + 2.0f * padY, 6.0f * s);
+    nvgFillColor(vg, rgbai(18, 18, 22, 244));
+    nvgFill(vg);
+    nvgStrokeColor(vg, rgbai(201, 168, 106, 110));
+    nvgStrokeWidth(vg, 1.0f);
+    nvgStroke(vg);
+
+    nvgFillColor(vg, kText);
+    nvgTextBox(vg, bx + padX, by + padY - b[1], maxW, str, nullptr);
+    nvgRestore(vg);
 }
 
 void Painter::paintKnobSprite(NVGcontext* vg, float size, float value01) const
@@ -439,8 +540,9 @@ static void screwHead(NVGcontext* vg, float cx, float cy, float r)
     nvgStroke(vg);
 }
 
-void Painter::paintPickupArt(NVGcontext* vg, float x, float y, float w, float h,
-                             int family, bool bright) const
+// Authored upright: the pickup's long axis runs along y.
+static void paintPickupUpright(NVGcontext* vg, float x, float y, float w, float h,
+                               int family, bool bright)
 {
     const float cx = x + w * 0.5f;
     const float cy = y + h * 0.5f;
@@ -643,6 +745,28 @@ void Painter::paintPickupArt(NVGcontext* vg, float x, float y, float w, float h,
     }
 }
 
+void Painter::paintPickupArt(NVGcontext* vg, float x, float y, float w, float h,
+                             int family, bool bright) const
+{
+    // Pickups are shown lying horizontal. The artwork above is authored upright,
+    // so draw it a quarter turn clockwise with the rect's sides swapped. The two
+    // exceptions are the piezo strip, which is already horizontal, and the
+    // acoustic body, which is a body outline rather than a pickup.
+    if (family == 3 || family == 4)
+    {
+        paintPickupUpright(vg, x, y, w, h, family, bright);
+        return;
+    }
+
+    const float cx = x + w * 0.5f;
+    const float cy = y + h * 0.5f;
+    nvgSave(vg);
+    nvgTranslate(vg, cx, cy);
+    nvgRotate(vg, 1.5707964f);   // 90° (y grows downwards, so this is clockwise)
+    paintPickupUpright(vg, -h * 0.5f, -w * 0.5f, h, w, family, bright);
+    nvgRestore(vg);
+}
+
 // ---------------------------------------------------------------- panels
 
 static void paintPanel(NVGcontext* vg, const RectF& r, float s, const char* title)
@@ -682,7 +806,7 @@ static void paintCard(NVGcontext* vg, const RectF& r, float s, bool selected, bo
 // ---------------------------------------------------------------- full paint
 
 void Painter::paint(NVGcontext* vg, float w, float h, const Params& p,
-                    const Hit& hover, const Hit& grab) const
+                    const Hit& hover, const Hit& grab, float mouseX, float mouseY) const
 {
     const Layout L = makeLayout(w, h);
     const float s = L.s;
@@ -762,26 +886,23 @@ void Painter::paint(NVGcontext* vg, float w, float h, const Params& p,
         const bool sel = from == i;
         const bool hov = hover.type == Hit::TILE && hover.index == i;
         paintCard(vg, t, s, sel, hov);
-        paintPickupArt(vg, t.x + 6.0f * s, t.y + 6.0f * s, t.w - 12.0f * s, t.h - 58.0f * s,
+        paintPickupArt(vg, t.x + 9.0f * s, t.y + 15.0f * s, 130.0f * s, 84.0f * s,
                        i == 3 ? 3 : (i == 0 ? 2 : 0), i == 2);
-        const float ly = t.y + t.h - 44.0f * s;
+        // labels sit in the column to the right of the artwork, vertically centred
+        int lines = 0;
+        for (int ln = 0; ln < 2; ++ln)
+            if (kTileLabels[i][ln] != nullptr)
+                ++lines;
+        const float ly = t.y + t.h * 0.5f - (float)(lines - 1) * 7.5f * s;
         for (int ln = 0; ln < 2; ++ln)
         {
             if (kTileLabels[i][ln] == nullptr)
                 break;
-            text(vg, t.x + t.w * 0.5f, ly + ln * 15.0f * s, kTileLabels[i][ln],
+            text(vg, t.x + 180.0f * s, ly + ln * 15.0f * s, kTileLabels[i][ln],
                  11.0f * s, sel ? kBrassBright : kTextMid,
                  NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE, sel, 0.4f * s);
         }
     }
-    {
-        const RectF& pill = L.pickupEnablePill;
-        const bool on = p.v[kPickupEnabled] > 0.5f;
-        drawToggle(vg, pill, on, hover.type == Hit::PICKUP_ENABLE);
-        text(vg, L.pickupEnableLabel.x, pill.y + pill.h * 0.5f, "Pickup simulation",
-             11.5f * s, kTextMid, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE, false);
-    }
-
     // ---- target panel ----
     paintPanel(vg, L.tgtPanel, s, "TARGET MODEL");
     {
@@ -866,13 +987,19 @@ void Painter::paint(NVGcontext* vg, float w, float h, const Params& p,
         text(vg, cx, c.y + c.h + 22.0f * s, buf, 12.5f * s, rgbi(207, 201, 187),
              NVG_ALIGN_CENTER | NVG_ALIGN_TOP, false);
     }
-    for (int i = 0; i < 2; ++i)
     {
-        const RectF& pill = L.togglePill[i];
-        const bool on = p.v[kToggles[i].param] > 0.5f;
-        drawToggle(vg, pill, on, hover.type == Hit::TOGGLE && hover.index == kToggles[i].param);
-        text(vg, L.toggleLabel[i].x, pill.y + pill.h * 0.5f, kToggles[i].label,
-             11.5f * s, kTextMid, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE, false);
+        const RectF& c = L.phaseCell;
+        const float cx = c.x + c.w * 0.5f;
+        const float cy = c.y + c.h * 0.5f;
+        const bool on = p.v[kBodyPhase] > 0.5f;
+        const bool hot = hover.type == Hit::TOGGLE && hover.index == kBodyPhase;
+        drawRoundToggle(vg, cx, cy, 30.0f * s, on, hot);
+        text(vg, cx, c.y + c.h + 7.0f * s, "Phase", 11.0f * s, kTextMid,
+             NVG_ALIGN_CENTER | NVG_ALIGN_TOP, false, 0.3f * s);
+        char buf[48];
+        valueText(kBodyPhase, p.v[kBodyPhase], buf, sizeof(buf));
+        text(vg, cx, c.y + c.h + 22.0f * s, buf, 12.5f * s, rgbi(207, 201, 187),
+             NVG_ALIGN_CENTER | NVG_ALIGN_TOP, false);
     }
 
     // ---- custom X/Y panel ----
@@ -959,6 +1086,14 @@ void Painter::paint(NVGcontext* vg, float w, float h, const Params& p,
         for (int i = 0; i < 3; ++i)
             text(vg, L.customPanel.x + L.customPanel.w * 0.5f, L.padReadout.y + (26.0f + 14.0f * i) * s,
                  hint[i], 10.0f * s, kTextDim, NVG_ALIGN_CENTER | NVG_ALIGN_TOP, false);
+    }
+
+    // ---- hover tooltip (last, so it sits on top) ----
+    if (mouseX >= 0.0f && mouseY >= 0.0f && grab.type == Hit::NONE)
+    {
+        const char* tip = tooltipText(hover);
+        if (tip != nullptr)
+            drawTooltip(vg, w, h, s, mouseX, mouseY, tip);
     }
 }
 

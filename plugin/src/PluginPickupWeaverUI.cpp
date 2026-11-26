@@ -26,7 +26,9 @@ public:
           fGrabY(0.0f),
           fGrabValue(0.0f),
           fLastClickTime(0),
-          fLastClick()
+          fLastClick(),
+          fMouseX(-1.0f),
+          fMouseY(-1.0f)
     {
         fParams.setDefaults();
         fPainter.init(getContext());
@@ -40,7 +42,8 @@ public:
 protected:
     void onNanoDisplay() override
     {
-        fPainter.paint(getContext(), (float)getWidth(), (float)getHeight(), fParams, fHover, fGrab);
+        fPainter.paint(getContext(), (float)getWidth(), (float)getHeight(), fParams, fHover, fGrab,
+                       fMouseX, fMouseY);
     }
 
     void parameterChanged(uint32_t index, float value) override
@@ -57,8 +60,11 @@ protected:
         if (ev.button != kMouseButtonLeft)
             return false;
 
-        const float x = (float)ev.pos.getX();
-        const float y = (float)ev.pos.getY();
+        float x = (float)ev.pos.getX();
+        float y = (float)ev.pos.getY();
+        toUiCoords(x, y);
+        fMouseX = x;
+        fMouseY = y;
         const Layout L = pw::ui::makeLayout((float)getWidth(), (float)getHeight());
 
         if (ev.press)
@@ -112,9 +118,6 @@ protected:
             case Hit::BYPASS:
                 setParam(kBypass, fParams.v[kBypass] > 0.5f ? 0.0f : 1.0f, true);
                 break;
-            case Hit::PICKUP_ENABLE:
-                setParam(kPickupEnabled, fParams.v[kPickupEnabled] > 0.5f ? 0.0f : 1.0f, true);
-                break;
             default:
                 break;
             }
@@ -140,8 +143,11 @@ protected:
 
     bool onMotion(const MotionEvent& ev) override
     {
-        const float x = (float)ev.pos.getX();
-        const float y = (float)ev.pos.getY();
+        float x = (float)ev.pos.getX();
+        float y = (float)ev.pos.getY();
+        toUiCoords(x, y);
+        fMouseX = x;
+        fMouseY = y;
         const Layout L = pw::ui::makeLayout((float)getWidth(), (float)getHeight());
 
         if (fGrab.type == Hit::KNOB)
@@ -159,7 +165,7 @@ protected:
         }
 
         const Hit h = pw::ui::hitTest(L, x, y);
-        if (h != fHover)
+        if (h != fHover || pw::ui::tooltipText(h) != nullptr)
         {
             fHover = h;
             repaint();
@@ -169,8 +175,11 @@ protected:
 
     bool onScroll(const ScrollEvent& ev) override
     {
-        const float x = (float)ev.pos.getX();
-        const float y = (float)ev.pos.getY();
+        float x = (float)ev.pos.getX();
+        float y = (float)ev.pos.getY();
+        toUiCoords(x, y);
+        fMouseX = x;
+        fMouseY = y;
         const Layout L = pw::ui::makeLayout((float)getWidth(), (float)getHeight());
         const Hit h = pw::ui::hitTest(L, x, y);
         const float d = (float)ev.delta.getY();
@@ -192,6 +201,19 @@ protected:
     }
 
 private:
+    // Mouse events arrive in window pixels while DGL's auto-scaling keeps the
+    // painter in logical units, so convert before hit-testing (no-op at 1:1).
+    void toUiCoords(float& x, float& y) const
+    {
+        const uint windowW = getWindow().getWidth();
+        const uint windowH = getWindow().getHeight();
+        if (windowW > 0 && windowH > 0)
+        {
+            x *= (float)getWidth() / (float)windowW;
+            y *= (float)getHeight() / (float)windowH;
+        }
+    }
+
     void setParam(uint32_t index, float value, bool gesture = false)
     {
         const ParamSpec& sp = kSpecs[index];
@@ -235,6 +257,8 @@ private:
     float fGrabValue;
     uint32_t fLastClickTime;
     Hit fLastClick;
+    float fMouseX;
+    float fMouseY;
 
     DISTRHO_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PickupWeaverUI)
 };

@@ -191,6 +191,9 @@ int main(int argc, char** argv)
     {
         pw::ui::Params p;
         p.setDefaults();
+        pw::ui::Hit hover;
+        float mx = -1.0f, my = -1.0f;
+        std::string hoverSpec;
         for (int i = 5; i < argc; ++i)
         {
             char* const eq = std::strchr(argv[i], '=');
@@ -198,6 +201,9 @@ int main(int argc, char** argv)
             *eq = 0;
             const char* const sym = argv[i];
             const float value = (float)std::atof(eq + 1);
+            if (std::strcmp(sym, "mx") == 0) { mx = value; continue; }
+            if (std::strcmp(sym, "my") == 0) { my = value; continue; }
+            if (std::strcmp(sym, "hover") == 0) { hoverSpec = eq + 1; continue; }
             for (uint32_t k = 0; k < kParamCount; ++k)
             {
                 if (std::strcmp(kSpecs[k].symbol, sym) == 0)
@@ -207,10 +213,27 @@ int main(int argc, char** argv)
                 }
             }
         }
+        // hover=<kind>[:<index>] simulates a pointer over a control (mx/my place the tooltip)
+        if (!hoverSpec.empty())
+        {
+            const size_t colon = hoverSpec.find(':');
+            const std::string kind = hoverSpec.substr(0, colon);
+            const int idx = colon == std::string::npos ? -1 : std::atoi(hoverSpec.c_str() + colon + 1);
+            struct KindDef { const char* name; uint8_t type; };
+            static const KindDef kKinds[] = {
+                { "knob", pw::ui::Hit::KNOB }, { "tile", pw::ui::Hit::TILE },
+                { "row", pw::ui::Hit::ROW }, { "toggle", pw::ui::Hit::TOGGLE },
+                { "pad", pw::ui::Hit::PAD }, { "prev", pw::ui::Hit::PREV },
+                { "next", pw::ui::Hit::NEXT }, { "bypass", pw::ui::Hit::BYPASS },
+            };
+            for (const KindDef& kd : kKinds)
+                if (kind == kd.name)
+                    { hover.type = kd.type; hover.index = idx; break; }
+        }
         glClearColor(0.07f, 0.07f, 0.09f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         nvgBeginFrame(vg, (float)w, (float)h, 1.0f);
-        painter.paint(vg, (float)w, (float)h, p, pw::ui::Hit(), pw::ui::Hit());
+        painter.paint(vg, (float)w, (float)h, p, hover, pw::ui::Hit(), mx, my);
         nvgEndFrame(vg);
         glFinish();
 

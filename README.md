@@ -21,12 +21,12 @@ The 15 parameters use the reference plugin's ranges and plain units.
 
 | Parameter | Range | Function |
 |---|---|---|
-| Pickup Enabled | on/off | engage the pickup model (squared 20 ms crossfade) |
+| Pickup Enabled | on/off | engage the pickup model (squared 20 ms crossfade); parameter only, no GUI control |
 | Pickup From | 4 families | source pickup family: Humbucker, Single Coil, Single Coil (Bright), Piezo |
 | Pickup To | 29 models | target pickup (model list, ◀ ▶ or the drop-down) |
 | Amount | 0–100 % | morph between the source and the target pickup |
 | Custom X / Custom Y | 0–100 % | the two-axis custom pickup model |
-| Body Enabled | on/off | engage the hollow-body stage |
+| Body Enabled | on/off | engage the hollow-body stage; parameter only, no GUI control |
 | Body Thickness | 10–100 mm | body size / lowest mode |
 | Body Amount | 0–100 % | body contribution |
 | Body Phase | on/off | body polarity |
@@ -40,14 +40,22 @@ Continuous knobs smooth over a fixed 11.61 ms (the reference engine's
 512-sample ramp); the pickup model glides over 20 ms and the enable/phase
 switches crossfade over 20 ms, as measured on the reference.
 
+`Pickup Enabled` and `Body Enabled` stay host parameters (automation,
+presets, MOD's generated settings panel) but have no control on the
+plugin's own GUIs: the GUI leaves them out, and at Amount / Body Amount
+0 % the corresponding stage is already an exact unity pass.
+
 ## GUI
 
 The desktop UI is a NanoVG vector interface (no raster assets, HiDPI and
-user resizing, locked 1180×640 aspect): source tiles, the target model
+user resizing, locked 1180×640 aspect): source rows, the target model
 display with pickup artwork, the model list, the seven main knobs and the
-body/phase switches, plus the Custom X/Y pad. Knobs drag vertically (Shift
+body Phase switch, plus the Custom X/Y pad. Knobs drag vertically (Shift
 for fine), wheel steps, double-click resets; click-type changes are
 bracketed with `editParameter` so hosts record them as automation.
+
+Hovering a control (knobs, source rows, phase switch, bypass, ◀ ▶, the X/Y
+pad) shows a one-line description in a tooltip that follows the pointer.
 
 The **modgui** for MOD Devices / MOD Desktop / Zynthian is pure HTML/CSS
 inside the LV2 bundle (`modgui/`), with native `<select>` drop-downs for

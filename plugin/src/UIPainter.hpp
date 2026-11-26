@@ -46,8 +46,7 @@ struct Hit
         PAD,            // custom X/Y pad
         PREV,           // previous model button
         NEXT,           // next model button
-        BYPASS,         // bypass button
-        PICKUP_ENABLE   // pickup simulation on/off pill
+        BYPASS          // bypass button
     };
 
     uint8_t type = NONE;
@@ -61,11 +60,11 @@ struct Layout
 {
     float s = 1;        // scale relative to the base design
     RectF header, bypassBtn;
-    RectF srcPanel, tiles[4], pickupEnablePill, pickupEnableLabel;
+    RectF srcPanel, tiles[4];
     RectF tgtPanel, art, groupLbl, nameLbl, prevBtn, nextBtn, listArea;
     float listRowH = 20, listColW = 198;
     RectF ctlPanel, knobCell[7];
-    RectF togglePill[2], toggleLabel[2];
+    RectF phaseCell;
     RectF customPanel, pad, padReadout;
 };
 
@@ -79,6 +78,9 @@ void valueText(int param, float value, char* buf, size_t cap);
 // 0 single coil, 1 P90, 2 humbucker, 3 piezo, 4 acoustic body, 5 custom.
 int familyOfModel(int model);
 
+// Short hover description for a control, or nullptr if it has none.
+const char* tooltipText(const Hit& hit);
+
 class Painter
 {
 public:
@@ -87,7 +89,8 @@ public:
     void destroy(NVGcontext* vg);
 
     void paint(NVGcontext* vg, float w, float h, const Params& p,
-               const Hit& hover, const Hit& grab) const;
+               const Hit& hover, const Hit& grab,
+               float mouseX = -1.0f, float mouseY = -1.0f) const;
 
     // Standalone pieces used by the offscreen renderer for modgui assets.
     void paintKnobSprite(NVGcontext* vg, float size, float value01) const;

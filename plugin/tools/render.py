@@ -7,9 +7,13 @@ Runs plugin/build/pw_render_ui under Xvfb and converts its PPM output:
   art   -> RGBA png with the magenta background keyed out (pickup art)
 
 Usage:
-  render.py ui <out.png> [width height] [sym=value ...]
+  render.py ui <out.png> [width height] [sym=value ...] [hover=kind[:index]] [mx=px my=px]
   render.py knobs <out.png> [frames] [size]
   render.py art <family> <out.png> [size] [bright]
+
+`hover=kind[:index]` (kind: knob, tile, row, toggle, pad, prev, next, bypass)
+plus `mx`/`my` draw the UI as if the pointer were over that control, which is
+how tooltips are verified headlessly.
 """
 
 import os

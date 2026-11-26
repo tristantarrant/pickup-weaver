@@ -55,12 +55,17 @@ link X11, so it still loads on MOD hardware and other headless systems; the modg
 ## Desktop GUI
 - NanoVG vector UI, no raster assets: scales crisply at any size. Follows the host/desktop HiDPI
   factor automatically and supports window resizing with a locked 1180×640 aspect ratio.
-- Layout: `dataforte` wordmark + bypass; **Source** tiles for the four input pickup types;
+- Layout: `dataforte` wordmark + bypass; **Source** rows for the four input pickup types
+  (pickup artwork lies horizontal);
   **Target** model display with pickup artwork, a grouped list of all 29 models and ◀ ▶ stepping;
-  knobs (Mix, Gain, Brightness, Body Mix, Thickness, Volume, Tone) and Body Enable/Phase toggles;
+  knobs (Mix, Gain, Brightness, Body Mix, Thickness, Volume, Tone) and the Body Phase switch;
   a Custom X/Y pad for the two custom models.
+- `Pickup Enabled` and `Body Enabled` are parameter-only (host automation, presets, MOD's generated
+  settings panel): they have no control in the GUI, where Amount / Body Amount 0 % is already an
+  exact unity pass.
 - Interaction: drag knobs vertically (Shift = fine), wheel steps, double-click resets a knob;
-  the wheel over the model list steps through models. Click-type changes bracket
+  the wheel over the model list steps through models; hovering a control shows a short tooltip
+  next to the pointer. Click-type changes bracket
   `editParameter`, so hosts record them as automation.
 
 ## MOD GUI (modgui)
@@ -74,7 +79,7 @@ Knob sprites are rendered by the same painter as the desktop GUI.
 ## Tools
 | tool | |
 |---|---|
-| `tools/render.py` | offscreen screenshots + sprites: `render.py ui out.png [W H] [sym=value ...]`, `render.py knobs out.png [frames] [size]`, `render.py art <family> <out.png>` (runs `pw_render_ui` under Xvfb) |
+| `tools/render.py` | offscreen screenshots + sprites: `render.py ui out.png [W H] [sym=value ...] [hover=kind[:i] mx=.. my=..]`, `render.py knobs out.png [frames] [size]`, `render.py art <family> <out.png>` (runs `pw_render_ui` under Xvfb) |
 | `tools/embed_assets.py` | regenerates `src/UIAssets.{hpp,cpp}` (fonts subsetted with fontTools) |
 | `tools/build_wordmark_font.py` | builds `assets/dataforte-wordmark.ttf` from the Bitcount Grid Double variable font: weight 400 instance, subsetted to the wordmark letters, composites flattened (NanoVG's stb_truetype cannot draw them) and the family renamed |
 | `tools/gen_modgui_html.py` | regenerates `modgui/icon.html` from `../data/pickup_models.csv` |
